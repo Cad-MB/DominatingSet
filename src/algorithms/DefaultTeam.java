@@ -2,83 +2,89 @@ package algorithms;
 
 import java.awt.Point;
 import java.util.ArrayList;
-
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.util.HashSet;
+import java.util.PriorityQueue;
+import java.util.Set;
 
 public class DefaultTeam {
-  public ArrayList<Point> calculDominatingSet(ArrayList<Point> points, int edgeThreshold) {
-    //REMOVE >>>>>
-    ArrayList<Point> result = (ArrayList<Point>)points.clone();
-    for (int i=0;i<points.size()/3;i++) result.remove(0);
-    // if (false) result = readFromFile("output0.points");
-    // else saveToFile("output",result);
-    //<<<<< REMOVE
 
+  public ArrayList<Point> calculDominatingSet(ArrayList<Point> points, int edgeThreshold) {
+    ArrayList<Point> result = new ArrayList<>();
+    Set<Point> remaining = new HashSet<>(points);
+
+    while (!remaining.isEmpty()) {
+      Point bestPoint = selectBestPoint(remaining, edgeThreshold);
+      if (bestPoint == null) break;
+
+      result.add(bestPoint);
+      removeNeighbors(bestPoint, remaining, edgeThreshold);
+    }
+
+    return localSearch(result, points, edgeThreshold);
+  }
+
+  private Point selectBestPoint(Set<Point> points, int edgeThreshold) {
+    PriorityQueue<Point> priorityQueue = new PriorityQueue<>((a, b) -> {
+      int scoreA = weightedNeighborScore(a, points, edgeThreshold);
+      int scoreB = weightedNeighborScore(b, points, edgeThreshold);
+      return Integer.compare(scoreB, scoreA);
+    });
+    priorityQueue.addAll(points);
+    return priorityQueue.isEmpty() ? null : priorityQueue.poll();
+  }
+
+  private int weightedNeighborScore(Point p, Set<Point> points, int edgeThreshold) {
+    int score = 0;
+    for (Point q : points) {
+      if (p.distance(q) <= edgeThreshold) {
+        score += 1;
+      }
+    }
+    return score;
+  }
+
+  private void removeNeighbors(Point p, Set<Point> points, int edgeThreshold) {
+    points.removeIf(q -> p.distance(q) <= edgeThreshold);
+  }
+
+  private ArrayList<Point> localSearch(ArrayList<Point> initialSet, ArrayList<Point> points, int edgeThreshold) {
+    ArrayList<Point> result = new ArrayList<>(initialSet);
+    for (int i = 0; i < result.size(); i++) {
+      Point removed = result.get(i);
+      result.remove(i);
+
+      if (!isDominatingSet(result, points, edgeThreshold)) {
+        result.add(i, removed);
+      }
+    }
     return result;
   }
-  
-  
-  //FILE PRINTER
-  private void saveToFile(String filename,ArrayList<Point> result){
-    int index=0;
-    try {
-      while(true){
-        BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(filename+Integer.toString(index)+".points")));
-        try {
-          input.close();
-        } catch (IOException e) {
-          System.err.println("I/O exception: unable to close "+filename+Integer.toString(index)+".points");
+
+  private boolean isDominatingSet(ArrayList<Point> set, ArrayList<Point> points, int edgeThreshold) {
+    Set<Point> covered = new HashSet<>(set);
+
+    for (Point p : set) {
+      for (Point q : points) {
+        if (p.distance(q) <= edgeThreshold) {
+          covered.add(q);
         }
-        index++;
       }
-    } catch (FileNotFoundException e) {
-      printToFile(filename+Integer.toString(index)+".points",result);
     }
-  }
-  private void printToFile(String filename,ArrayList<Point> points){
-    try {
-      PrintStream output = new PrintStream(new FileOutputStream(filename));
-      int x,y;
-      for (Point p:points) output.println(Integer.toString((int)p.getX())+" "+Integer.toString((int)p.getY()));
-      output.close();
-    } catch (FileNotFoundException e) {
-      System.err.println("I/O exception: unable to create "+filename);
-    }
+    return covered.containsAll(points);
   }
 
-  //FILE LOADER
-  private ArrayList<Point> readFromFile(String filename) {
-    String line;
-    String[] coordinates;
-    ArrayList<Point> points=new ArrayList<Point>();
-    try {
-      BufferedReader input = new BufferedReader(
-          new InputStreamReader(new FileInputStream(filename))
-          );
-      try {
-        while ((line=input.readLine())!=null) {
-          coordinates=line.split("\\s+");
-          points.add(new Point(Integer.parseInt(coordinates[0]),
-                Integer.parseInt(coordinates[1])));
-        }
-      } catch (IOException e) {
-        System.err.println("Exception: interrupted I/O.");
-      } finally {
-        try {
-          input.close();
-        } catch (IOException e) {
-          System.err.println("I/O exception: unable to close "+filename);
-        }
-      }
-    } catch (FileNotFoundException e) {
-      System.err.println("Input file not found.");
+  public ArrayList<Point> geometricOptimization(ArrayList<Point> points, int edgeThreshold) {
+    ArrayList<ArrayList<Point>> cells = divideIntoCells(points, edgeThreshold);
+    ArrayList<Point> result = new ArrayList<>();
+    for (ArrayList<Point> cell : cells) {
+      result.addAll(calculDominatingSet(cell, edgeThreshold));
     }
-    return points;
+    return result;
+  }
+
+  private ArrayList<ArrayList<Point>> divideIntoCells(ArrayList<Point> points, int edgeThreshold) {
+    ArrayList<ArrayList<Point>> cells = new ArrayList<>();
+    cells.add(points);
+    return cells;
   }
 }
