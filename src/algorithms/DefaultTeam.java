@@ -2,366 +2,339 @@ package algorithms;
 
 import java.awt.Point;
 import java.util.*;
-
 import java.util.stream.Collectors;
 
 public class DefaultTeam {
 
-  private static final double DISTANCE_THRESH_2K = 2;
-  private float edgeThreshold;
-  private Map<Point, List<Point>> coverToCovertee;
-  private Map<Point, List<Point>> coverteeToCovers;
+  private static final double MULTIPLIER = 2.0;
+  private float rangeLimit;
+  private Map<Point, List<Point>> influenceMap;
+  private Map<Point, List<Point>> influencedByMap;
 
-  public ArrayList<Point> calculDominatingSet(ArrayList<Point> points, int edgeThreshold) {
-    this.edgeThreshold = edgeThreshold;
-    this.coverToCovertee = new HashMap<>();
-    this.coverteeToCovers = new HashMap<>();
+  public ArrayList<Point> calculDominatingSet(ArrayList<Point> nodes, int rangeThreshold) {
+    this.rangeLimit = rangeThreshold;
+    this.influenceMap = new HashMap<>();
+    this.influencedByMap = new HashMap<>();
 
-    List<Point> result = findApproximation(points);
+    List<Point> resultSet = generateInitialSolution(nodes);
 
-    for(int repeat = 0; repeat < 5; repeat++){
-      List<List<Point>> clusters = getClustersOfCoverteesWithMnayCovers(edgeThreshold, result);
+    for (int cycle = 0; cycle < 5; cycle++) {
+      List<List<Point>> clusters = detectClusters(rangeThreshold, resultSet);
       for (List<Point> cluster : clusters) {
-        ArrayList<Point> covers = getCovers(cluster);
+        ArrayList<Point> localCovers = getCovers(cluster);
+        ArrayList<Point> extendedCluster = extendCluster(cluster);
+        ArrayList<Point> existingCovers = filterExistingCovers(resultSet, cluster);
+        List<Point> refinedSolution = refineClusterSolution(extendedCluster, nodes, existingCovers);
 
-        ArrayList<Point> augmentedCluster = getAugmentedCluster(cluster);
-        ArrayList<Point> alreadyCovers = getAlreadyCovers(result, cluster);
-        List<Point> newLocalSolution = findApproximationSubGraph(augmentedCluster, points, alreadyCovers);
-        HashSet<Point> ok = new HashSet<>(result);
-        ok.removeAll(covers);
-        ok.addAll(newLocalSolution);
-        if(result.size() > ok.size()){
-          result = new ArrayList<>(ok);
+        HashSet<Point> updatedSet = new HashSet<>(resultSet);
+        updatedSet.removeAll(localCovers);
+        updatedSet.addAll(refinedSolution);
+
+        if (resultSet.size() > updatedSet.size()) {
+          resultSet = new ArrayList<>(updatedSet);
         }
       }
     }
-    result.addAll(getDegree0Nodes(points));
-    return (ArrayList<Point>) result;
+
+    resultSet.addAll(findIsolatedNodes(nodes));
+    return new ArrayList<>(resultSet);
   }
 
-  private List<Point> findApproximation(ArrayList<Point> targetPoints) {
-    int minSize = targetPoints.size();
-    List<Point> result = null;
+  private List<Point> generateInitialSolution(ArrayList<Point> targets) {
+    int minSize = targets.size();
+    List<Point> optimalSolution = null;
 
-    for (int tries = 0; tries < 10; tries++) {
-      this.coverToCovertee = new HashMap<>();
-      this.coverteeToCovers = new HashMap<>();
+    for (int attempt = 0; attempt < 10; attempt++) {
+      this.influenceMap.clear();
+      this.influencedByMap.clear();
 
-      List<List<Point>> searchSpaceAdj = getGraphAsAdjecencyList(targetPoints);
-      ArrayList<Point> randomSolution = (ArrayList<Point>) getRandomSolution(targetPoints, searchSpaceAdj, targetPoints);
-      int oldSize;
+      List<List<Point>> adjacency = buildAdjacencyList(targets);
+      ArrayList<Point> candidate = (ArrayList<Point>) buildRandomSolution(targets, adjacency, targets);
+
+      int prevSize;
       do {
-        oldSize = randomSolution.size();
-        randomSolution = (ArrayList<Point>) doK2LocalSearch(randomSolution, targetPoints, targetPoints);
-      } while (oldSize > randomSolution.size());
+        prevSize = candidate.size();
+        candidate = (ArrayList<Point>) applyLocalOptimization(candidate, targets, targets);
+      } while (prevSize > candidate.size());
 
-      if (randomSolution.size() < minSize) {
-        minSize = randomSolution.size();
-        result = randomSolution;
+      if (candidate.size() < minSize) {
+        minSize = candidate.size();
+        optimalSolution = candidate;
       }
     }
-    return result;
+    return optimalSolution;
   }
 
+  private List<Point> refineClusterSolution(ArrayList<Point> cluster, ArrayList<Point> domain, ArrayList<Point> existingCovers) {
+    int smallestSize = cluster.size();
+    List<Point> bestSolution = null;
 
-  private List<Point> findApproximationSubGraph(ArrayList<Point> targetPoints, ArrayList<Point> searchSpace, ArrayList<Point> alreadySolutions) {
-    int minSize = targetPoints.size();
-    List<Point> result = null;
+    for (int iteration = 0; iteration < 20; iteration++) {
+      this.influenceMap.clear();
+      this.influencedByMap.clear();
 
-    for (int tries = 0; tries < 20; tries++) {
-      this.coverToCovertee = new HashMap<>();
-      this.coverteeToCovers = new HashMap<>();
+      for (Point cover : existingCovers) {
+        ArrayList<Point> neighbors = locateNeighbors(cover, domain, rangeLimit);
+        neighbors.add(cover);
+        this.influenceMap.put(cover, neighbors);
 
-      for (Point p : alreadySolutions) {
-        ArrayList<Point> neighbours = getNeighbours(p, searchSpace, edgeThreshold);
-        neighbours.add(p);
-        this.coverToCovertee.put(p, neighbours);
-
-        neighbours.forEach(n -> {
-          List<Point> old = coverteeToCovers.getOrDefault(n, new ArrayList<>());
-          old.add(p);
-          this.coverteeToCovers.put(n, old);
-        });
+        for (Point neighbor : neighbors) {
+          List<Point> influences = influencedByMap.getOrDefault(neighbor, new ArrayList<>());
+          influences.add(cover);
+          this.influencedByMap.put(neighbor, influences);
+        }
       }
-      List<List<Point>> searchSpaceAdj = getGraphAsAdjecencyList(searchSpace);
-      ArrayList<Point> randomSolution = (ArrayList<Point>) getRandomSolution(targetPoints, searchSpaceAdj, searchSpace);
 
-      int dontCount = countCoversAlreadyPresent(alreadySolutions, randomSolution);
+      List<List<Point>> adjacency = buildAdjacencyList(domain);
+      ArrayList<Point> candidate = (ArrayList<Point>) buildRandomSolution(cluster, adjacency, domain);
 
-      int oldSize = 0;
+      int excluded = countSharedCovers(existingCovers, candidate);
 
+      int previousSize;
       do {
-        oldSize = randomSolution.size() - dontCount;
-        dontCount = 0;
-        randomSolution = (ArrayList<Point>) doK2LocalSearch(randomSolution, targetPoints, searchSpace);
-        for (Point p : alreadySolutions) {
-          if (randomSolution.contains(p)) {
-            dontCount++;
+        previousSize = candidate.size() - excluded;
+        excluded = 0;
+        candidate = (ArrayList<Point>) applyLocalOptimization(candidate, cluster, domain);
+
+        for (Point cover : existingCovers) {
+          if (candidate.contains(cover)) {
+            excluded++;
           }
         }
-      } while (oldSize > randomSolution.size() - dontCount);
+      } while (previousSize > candidate.size() - excluded);
 
-      if (randomSolution.size() - dontCount < minSize) {
-        minSize = randomSolution.size() - dontCount;
-        result = randomSolution;
+      if (candidate.size() - excluded < smallestSize) {
+        smallestSize = candidate.size() - excluded;
+        bestSolution = candidate;
       }
     }
-    return result;
+    return bestSolution;
   }
 
-  private int countCoversAlreadyPresent(ArrayList<Point> alreadySolutions, ArrayList<Point> randomSolution) {
-    int dontCount = 0;
-    for (Point p : alreadySolutions) {
-      if (randomSolution.contains(p)) {
-        dontCount++;
+  private int countSharedCovers(ArrayList<Point> existing, ArrayList<Point> candidates) {
+    int count = 0;
+    for (Point cover : existing) {
+      if (candidates.contains(cover)) {
+        count++;
       }
     }
-    return dontCount;
+    return count;
   }
 
-  private ArrayList<Point> getAlreadyCovers(List<Point> result, List<Point> cluster) {
-    List<Point> alreadyCovers = new ArrayList<>();
+  private ArrayList<Point> filterExistingCovers(List<Point> currentSet, List<Point> cluster) {
+    List<Point> existing = new ArrayList<>();
     ArrayList<Point> clusterCovers = getCovers(cluster);
-    for (Point cover : result) {
+
+    for (Point cover : currentSet) {
       if (!clusterCovers.contains(cover)) {
-        alreadyCovers.add(cover);
+        existing.add(cover);
       }
     }
-    assert alreadyCovers.size() + clusterCovers.size() == result.size();
-    return (ArrayList<Point>) alreadyCovers;
+    return new ArrayList<>(existing);
   }
 
-  private ArrayList<Point> getAugmentedCluster(List<Point> cluster) {
-    ArrayList<Point> covers = getCovers(cluster);
-    ArrayList<Point> allCovertees = getCovertees(covers);
-    Set<Point> augmentedCluster = new HashSet<>();
-    augmentedCluster.addAll(cluster);
-    augmentedCluster.addAll(covers);
-    augmentedCluster.addAll(allCovertees);
-    return new ArrayList<>(augmentedCluster);
+  private ArrayList<Point> extendCluster(List<Point> cluster) {
+    ArrayList<Point> clusterCovers = getCovers(cluster);
+    ArrayList<Point> allNodes = getCoveredNodes(clusterCovers);
+
+    Set<Point> extendedSet = new HashSet<>();
+    extendedSet.addAll(cluster);
+    extendedSet.addAll(clusterCovers);
+    extendedSet.addAll(allNodes);
+
+    return new ArrayList<>(extendedSet);
   }
 
-  private List<List<Point>> getClustersOfCoverteesWithMnayCovers(int edgeThreshold, List<Point> covers) {
-    List<Point> coverteesWithManyCovers = getCoverteesWithManyCovers(covers);
+  private List<List<Point>> detectClusters(int rangeThreshold, List<Point> covers) {
+    List<Point> multipleCoversNodes = findNodesWithMultipleCovers(covers);
 
-    List<List<Point>> allPossibleClusters = new ArrayList<>();
+    List<List<Point>> preliminaryClusters = new ArrayList<>();
 
-    for (Point p1 : coverteesWithManyCovers) {
-      List<Point> done = new ArrayList<>();
-      List<Point> currentCluster = new ArrayList<>();
-      currentCluster.add(p1);
-      done.add(p1);
-      for (Point p2 : coverteesWithManyCovers) {
-        if (p1 == p2 || done.contains(p2)) {
+    for (Point primary : multipleCoversNodes) {
+      List<Point> checked = new ArrayList<>();
+      List<Point> cluster = new ArrayList<>();
+      cluster.add(primary);
+      checked.add(primary);
+
+      for (Point secondary : multipleCoversNodes) {
+        if (primary.equals(secondary) || checked.contains(secondary)) {
           continue;
         }
-        if (p1.distance(p2) <= 2 * edgeThreshold) {
-          currentCluster.add(p2);
-          done.add(p2);
+        if (primary.distance(secondary) <= 2 * rangeThreshold) {
+          cluster.add(secondary);
+          checked.add(secondary);
         }
       }
-      allPossibleClusters.add(currentCluster);
+      preliminaryClusters.add(cluster);
     }
+    preliminaryClusters.sort((cluster1, cluster2) -> Integer.compare(cluster2.size(), cluster1.size()));
 
-    allPossibleClusters = allPossibleClusters.stream()
-            .sorted(Comparator.comparingInt(List::size))
-            .collect(Collectors.toList());
-    Collections.reverse(allPossibleClusters);
+    List<List<Point>> validClusters = new ArrayList<>();
+    Set<Point> used = new HashSet<>();
 
-    List<List<Point>> chosenClusters = new ArrayList<>();
-
-    List<Point> done = new ArrayList<>();
-
-    for (List<Point> cluster_ : allPossibleClusters) {
-      for (Point p : cluster_) {
-        if (!done.contains(p) && done.stream().allMatch(donePoint -> !cluster_.contains(donePoint))) {
-          chosenClusters.add(cluster_);
-          done.addAll(cluster_);
-          break;
-        }
+    for (List<Point> cluster : preliminaryClusters) {
+      if (cluster.stream().noneMatch(used::contains)) {
+        validClusters.add(cluster);
+        used.addAll(cluster);
       }
     }
 
-    done = new ArrayList<>();
-    for (List<Point> cluster : chosenClusters) {
-      for (Point p : cluster) {
-        if (done.contains(p)) {
-          throw new RuntimeException("Duplicates!");
-        }
-        done.add(p);
-      }
-    }
-
-    return chosenClusters;
+    return validClusters;
   }
 
-  private List<Point> getCoverteesWithManyCovers(List<Point> covers) {
-    List<Point> coverteesWithManyCovers = new ArrayList<>();
-    for (Point coverteeKey : coverteeToCovers.keySet()) {
-      if (covers.contains(coverteeKey)) {
-        // add only non-covers
-        continue;
-      }
-      if (this.coverteeToCovers.get(coverteeKey).size() >= 2) {
-        // if the covertee has more than 2 covers it's considered
-        coverteesWithManyCovers.add(coverteeKey);
-      }
-    }
-    return coverteesWithManyCovers;
-  }
-
-  private List<List<Point>> getGraphAsAdjecencyList(ArrayList<Point> points) {
-    List<List<Point>> adj = new ArrayList<>();
-    for (int i = 0; i < points.size(); i++) {
-      for (Point neig : getNeighbours(points.get(i), points, this.edgeThreshold)) {
-        adj.add(new ArrayList<>(Arrays.asList(points.get(i), neig)));
-      }
-    }
-    return adj;
-  }
-
-  private List<Point> getRandomSolution(List<Point> targetPoints, List<List<Point>> searchSpaceAdj, List<Point> searchSpace) {
+  private List<Point> findNodesWithMultipleCovers(List<Point> covers) {
     List<Point> result = new ArrayList<>();
-    List<Point> covered = new ArrayList<>();
-    Collections.shuffle(searchSpaceAdj);
-    for (List<Point> edge : searchSpaceAdj) {
-      for (Point n : edge) {
-        if (!covered.contains(n) && targetPoints.contains(n)) {
-          result.add(n);
-          covered.add(n);
-
-          ArrayList<Point> coverteeOfThis = getNeighbours(n, searchSpace, this.edgeThreshold);
-          coverteeOfThis.add(n);
-
-          coverteeOfThis.forEach(p -> {
-            covered.add(p);
-            List<Point> old = coverteeToCovers.getOrDefault(p, new ArrayList<>());
-            old.add(n);
-            coverteeToCovers.put(p, old);
-          });
-
-          coverToCovertee.put(n, coverteeOfThis);
-        }
+    for (Point node : influencedByMap.keySet()) {
+      if (!covers.contains(node) && influencedByMap.get(node).size() >= 2) {
+        result.add(node);
       }
     }
     return result;
   }
 
-  private List<Point> doK2LocalSearch(List<Point> cover, List<Point> targetPoints, List<Point> searchSpace) {
-    for (int outer_i = 0; outer_i < cover.size(); outer_i++) {
-      for (int inner_i = outer_i; inner_i < cover.size(); inner_i++) {
-        Point p = cover.get(outer_i);
-        Point p2 = cover.get(inner_i);
-        if (p.distance(p2) > (edgeThreshold * DISTANCE_THRESH_2K)) {
+  private List<List<Point>> buildAdjacencyList(ArrayList<Point> nodes) {
+    List<List<Point>> adjacency = new ArrayList<>();
+    for (Point node : nodes) {
+      for (Point neighbor : locateNeighbors(node, nodes, rangeLimit)) {
+        adjacency.add(Arrays.asList(node, neighbor));
+      }
+    }
+    return adjacency;
+  }
+
+  private List<Point> buildRandomSolution(List<Point> targets, List<List<Point>> adjacency, List<Point> domain) {
+    List<Point> solution = new ArrayList<>();
+    Set<Point> coveredNodes = new HashSet<>();
+    Collections.shuffle(adjacency);
+
+    for (List<Point> edge : adjacency) {
+      for (Point node : edge) {
+        if (!coveredNodes.contains(node) && targets.contains(node)) {
+          solution.add(node);
+          coveredNodes.add(node);
+
+          ArrayList<Point> coveredByNode = locateNeighbors(node, domain, rangeLimit);
+          coveredByNode.add(node);
+
+          for (Point covered : coveredByNode) {
+            coveredNodes.add(covered);
+            influencedByMap.computeIfAbsent(covered, k -> new ArrayList<>()).add(node);
+          }
+
+          influenceMap.put(node, coveredByNode);
+        }
+      }
+    }
+    return solution;
+  }
+
+  private List<Point> applyLocalOptimization(List<Point> covers, List<Point> targets, List<Point> domain) {
+    for (int i = 0; i < covers.size(); i++) {
+      for (int j = i; j < covers.size(); j++) {
+        Point first = covers.get(i);
+        Point second = covers.get(j);
+
+        if (first.equals(second) || first.distance(second) > rangeLimit * MULTIPLIER) {
           continue;
         }
-        if (p == p2) {
-          continue;
-        }
-        List<Point> uniqueCoverteesOfPairInTarget = getUniqueCoverteesOfPair(p, p2, targetPoints);
-        for (Point out : searchSpace) {
-          if (getCentroid(Arrays.asList(p, p2)).distance(out) > edgeThreshold * DISTANCE_THRESH_2K) {
+
+        List<Point> uniqueNodes = findExclusiveNodes(first, second, targets);
+
+        for (Point candidate : domain) {
+          if (candidate.distance(getCentroid(Arrays.asList(first, second))) > rangeLimit * MULTIPLIER) {
             continue;
           }
-          ArrayList<Point> coverteesOfOut = getNeighbours(out, searchSpace, this.edgeThreshold);
-          coverteesOfOut.add(out);
-          if (coverteesOfOut.containsAll(uniqueCoverteesOfPairInTarget)) {
 
-            coverToCovertee.getOrDefault(p2, new ArrayList<>()).forEach(covertee -> {
-              if (coverteeToCovers.get(covertee) != null) {
-                coverteeToCovers.get(covertee).remove(p2);
-              }
-            });
-            coverToCovertee.getOrDefault(p, new ArrayList<>()).forEach(covertee -> {
-              if (coverteeToCovers.get(covertee) != null) {
-                coverteeToCovers.get(covertee).remove(p);
-              }
-            });
-            coverteeToCovers.get(p).remove(p);
-            coverteeToCovers.get(p2).remove(p2);
-            coverToCovertee.remove(p);
-            coverToCovertee.remove(p2);
+          ArrayList<Point> candidateCovers = locateNeighbors(candidate, domain, rangeLimit);
+          candidateCovers.add(candidate);
 
-            coverToCovertee.put(out, coverteesOfOut);
-            coverteeToCovers.getOrDefault(out, new ArrayList<>()).remove(p);
-            coverteeToCovers.getOrDefault(out, new ArrayList<>()).remove(p2);
-            coverteeToCovers.getOrDefault(out, new ArrayList<>()).add(out);
-            coverteesOfOut.forEach(cov -> {
-              List<Point> old = coverteeToCovers.getOrDefault(cov, new ArrayList<>());
-              old.add(out);
-              coverteeToCovers.put(cov, old);
-            });
-
-            cover.remove(p);
-            cover.remove(p2);
-            cover.add(out);
-            return cover;
+          if (candidateCovers.containsAll(uniqueNodes)) {
+            substituteCovers(covers, first, second, candidate, candidateCovers);
+            return covers;
           }
         }
       }
     }
-    return cover;
+    return covers;
   }
 
-  private List<Point> getUniqueCoverteesOfPair(Point a, Point b, List<Point> targetPoints) {
+  private void substituteCovers(List<Point> covers, Point first, Point second, Point replacement, List<Point> replacementCovers) {
+    updateMappingsOnRemoval(first);
+    updateMappingsOnRemoval(second);
 
-    List<Point> pair = new ArrayList<>(Arrays.asList(a, b));
+    covers.remove(first);
+    covers.remove(second);
 
-    Set<Point> coverteesOfPair = new HashSet<>();
-    pair.forEach(p -> coverteesOfPair.addAll(coverToCovertee.getOrDefault(p, new ArrayList<>())));
+    influenceMap.put(replacement, replacementCovers);
+    replacementCovers.forEach(node -> {
+      influencedByMap.computeIfAbsent(node, k -> new ArrayList<>()).add(replacement);
+    });
 
-    List<Point> result = new ArrayList<>();
-    for (Point covertee : coverteesOfPair) {
-      if (coverteeToCovers.get(covertee).stream().allMatch(cover -> pair.contains(cover) && targetPoints.contains(covertee))) {
-        // add a point if it's exclusively covered by this pair of nodes
-        // and if we are interested in in
-        result.add(covertee);
+    covers.add(replacement);
+  }
+
+  private void updateMappingsOnRemoval(Point point) {
+    List<Point> influenced = influenceMap.remove(point);
+    if (influenced != null) {
+      for (Point node : influenced) {
+        influencedByMap.get(node).remove(point);
       }
     }
-    return result;
+  }
+
+  private List<Point> findExclusiveNodes(Point a, Point b, List<Point> targets) {
+    Set<Point> sharedNodes = new HashSet<>();
+    sharedNodes.addAll(influenceMap.getOrDefault(a, Collections.emptyList()));
+    sharedNodes.addAll(influenceMap.getOrDefault(b, Collections.emptyList()));
+
+    List<Point> exclusiveNodes = new ArrayList<>();
+    for (Point node : sharedNodes) {
+      if (influencedByMap.getOrDefault(node, Collections.emptyList()).stream().allMatch(cover -> cover.equals(a) || cover.equals(b))) {
+        exclusiveNodes.add(node);
+      }
+    }
+    return exclusiveNodes;
   }
 
   private Point getCentroid(List<Point> points) {
     int sumX = 0;
     int sumY = 0;
-    for (Point p : points) {
-      sumX += p.x;
-      sumY += p.y;
+    for (Point point : points) {
+      sumX += point.x;
+      sumY += point.y;
     }
     return new Point(sumX / points.size(), sumY / points.size());
   }
 
-  private ArrayList<Point> getNeighbours(Point p, List<Point> vertices, float edgeThreshold) {
-    ArrayList<Point> result = new ArrayList();
-    Iterator var5 = vertices.iterator();
-
-    while (var5.hasNext()) {
-      Point point = (Point) var5.next();
-      if (point.distance(p) < (double) edgeThreshold && !point.equals(p)) {
-        result.add((Point) point.clone());
+  private ArrayList<Point> locateNeighbors(Point node, List<Point> domain, float threshold) {
+    ArrayList<Point> neighbors = new ArrayList<>();
+    for (Point candidate : domain) {
+      if (!candidate.equals(node) && candidate.distance(node) < threshold) {
+        neighbors.add((Point) candidate.clone());
       }
     }
-
-    return result;
+    return neighbors;
   }
 
-  private ArrayList<Point> getDegree0Nodes(ArrayList<Point> points) {
-    return (ArrayList<Point>) points.stream().filter(p -> getNeighbours(p, points, this.edgeThreshold).size() == 0).collect(Collectors.toList());
+  private ArrayList<Point> findIsolatedNodes(ArrayList<Point> nodes) {
+    return nodes.stream()
+            .filter(node -> locateNeighbors(node, nodes, rangeLimit).isEmpty())
+            .collect(Collectors.toCollection(ArrayList::new));
   }
 
-  private ArrayList<Point> getCovers(List<Point> covertees) {
-    Set<Point> result = new HashSet<>();
-    for (Point p : covertees) {
-      result.addAll(coverteeToCovers.get(p));
+  private ArrayList<Point> getCovers(List<Point> nodes) {
+    Set<Point> covers = new HashSet<>();
+    for (Point node : nodes) {
+      covers.addAll(influencedByMap.getOrDefault(node, Collections.emptyList()));
     }
-    return new ArrayList<>(result);
+    return new ArrayList<>(covers);
   }
 
-  private ArrayList<Point> getCovertees(List<Point> covers) {
-    Set<java.awt.Point> result = new HashSet<>();
-    for (Point p : covers) {
-      result.addAll(coverToCovertee.get(p));
+  private ArrayList<Point> getCoveredNodes(List<Point> covers) {
+    Set<Point> covered = new HashSet<>();
+    for (Point cover : covers) {
+      covered.addAll(influenceMap.getOrDefault(cover, Collections.emptyList()));
     }
-    return new ArrayList<>(result);
+    return new ArrayList<>(covered);
   }
 }
