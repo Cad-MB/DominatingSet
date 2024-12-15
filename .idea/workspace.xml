@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="167a1066-1c57-47d5-86ad-707255f333e0" name="Changes" comment="95.55">
+    <list default="true" id="167a1066-1c57-47d5-86ad-707255f333e0" name="Changes" comment=" 93 - 95.37">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dominatingSet.iml" beforeDir="false" afterPath="$PROJECT_DIR$/dominatingSet.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/algorithms/DefaultTeam.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/algorithms/DefaultTeam.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -86,7 +85,7 @@
       <workItem from="1733827724465" duration="4000" />
       <workItem from="1733835723783" duration="3270000" />
       <workItem from="1733847568965" duration="1884000" />
-      <workItem from="1734221602485" duration="325000" />
+      <workItem from="1734221602485" duration="5406000" />
     </task>
     <task id="LOCAL-00001" summary="95.55">
       <option name="closed" value="true" />
@@ -96,7 +95,15 @@
       <option name="project" value="LOCAL" />
       <updated>1733800562992</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="95.55">
+      <option name="closed" value="true" />
+      <created>1734222089061</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1734222089061</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -104,6 +111,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="95.55" />
-    <option name="LAST_COMMIT_MESSAGE" value="95.55" />
+    <MESSAGE value=" 93 - 95.37" />
+    <option name="LAST_COMMIT_MESSAGE" value=" 93 - 95.37" />
   </component>
 </project>
