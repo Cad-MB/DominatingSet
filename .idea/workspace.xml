@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="167a1066-1c57-47d5-86ad-707255f333e0" name="Changes" comment="to do">
+    <list default="true" id="167a1066-1c57-47d5-86ad-707255f333e0" name="Changes" comment="prcq fin">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/algorithms/DefaultTeam.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/algorithms/DefaultTeam.java" afterDir="false" />
     </list>
@@ -86,7 +86,7 @@
       <workItem from="1733835723783" duration="3270000" />
       <workItem from="1733847568965" duration="1884000" />
       <workItem from="1734221602485" duration="6125000" />
-      <workItem from="1734285983935" duration="8557000" />
+      <workItem from="1734285983935" duration="9638000" />
     </task>
     <task id="LOCAL-00001" summary="95.55">
       <option name="closed" value="true" />
@@ -120,7 +120,15 @@
       <option name="project" value="LOCAL" />
       <updated>1734291030238</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="prcq fin">
+      <option name="closed" value="true" />
+      <created>1734296900018</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1734296900018</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -131,6 +139,7 @@
     <MESSAGE value=" 93 - 95.37" />
     <MESSAGE value="76 - ." />
     <MESSAGE value="to do" />
-    <option name="LAST_COMMIT_MESSAGE" value="to do" />
+    <MESSAGE value="prcq fin" />
+    <option name="LAST_COMMIT_MESSAGE" value="prcq fin" />
   </component>
 </project>
